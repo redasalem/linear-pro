@@ -30,6 +30,17 @@ CREATE TABLE profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Organization Members
+-- Links users to organizations with a specific role
+CREATE TABLE organization_members (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+    role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('owner', 'admin', 'member')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(organization_id, user_id)
+);
+
 -- Teams
 -- Teams belong to organizations
 CREATE TABLE teams (
@@ -93,6 +104,7 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE issues ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE organization_members ENABLE ROW LEVEL SECURITY;
 
 -- Helper function to get current user's organization ID
 -- We use SECURITY DEFINER to bypass RLS internally and avoid infinite recursion when querying the profiles table
@@ -109,6 +121,11 @@ CREATE POLICY "Users can view their own organization"
 CREATE POLICY "Users can update their own organization"
     ON organizations FOR UPDATE
     USING (id = get_auth_org_id());
+
+-- Organization Members Policies
+CREATE POLICY "Users can view members in their organization"
+    ON organization_members FOR SELECT
+    USING (organization_id = get_auth_org_id());
 
 -- Profiles Policies
 CREATE POLICY "Users can view profiles in their organization"
